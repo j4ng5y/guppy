@@ -1,0 +1,6 @@
+# Go Stuff
+bin/
+
+# VSCode Stuff
+.vscode/
+.DS_Store
