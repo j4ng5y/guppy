@@ -48,6 +48,15 @@ func (I *Install) Run() error {
 	if err := I.download(); err != nil {
 		return err
 	}
+
+	if err := I.install(); err != nil {
+		return err
+	}
+
+	if err := I.writeRCFile(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -61,7 +70,12 @@ func (I *Install) getPWD() {
 }
 
 func (I *Install) calculateFilename() {
-	I.filename = fmt.Sprintf("%s.%s-%s.tar.gz", I.version, runtime.GOOS, runtime.GOARCH)
+	switch runtime.GOOS {
+	case "windows":
+		I.filename = fmt.Sprintf("%s.%s-%s.zip", I.version, runtime.GOOS, runtime.GOARCH)
+	default:
+		I.filename = fmt.Sprintf("%s.%s-%s.tar.gz", I.version, runtime.GOOS, runtime.GOARCH)
+	}
 }
 
 func (I *Install) calculateFilePath() {
@@ -89,4 +103,56 @@ func (I *Install) download() error {
 	_, err = io.Copy(f, resp.Body)
 
 	return err
+}
+
+func (I *Install) install() error {
+	log.Printf("Extracting and Installing %s\n", I.version)
+
+	switch runtime.GOOS {
+	case "windows":
+		if err := Unarchive(I.filepath, "C:\\"); err != nil {
+			return fmt.Errorf("unable to unzip and install due to error: %v", err)
+		}
+		if err := os.Setenv("GOROOT", "C:\\go"); err != nil {
+			return fmt.Errorf("unable to set the GOROOT environmental variable due to error: %v", err)
+		}
+	default:
+		if err := Unarchive(I.filepath, "/usr/local"); err != nil {
+			return fmt.Errorf("unable to untar and install due to error: %v", err)
+		}
+		if err := os.Setenv("GOROOT", "/usr/local/go"); err != nil {
+			return fmt.Errorf("unable to set the GOROOT environmental variable due to error: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (I *Install) writeRCFile() error {
+	foundRCFiles := []string{}
+	for _, i := range []string{
+		"/etc/bashrc",
+		"/etc/zshrc",
+	} {
+		_, err := os.Stat(i)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+		}
+		foundRCFiles = append(foundRCFiles, i)
+
+		f, err := os.OpenFile(i, os.O_RDWR|os.O_APPEND, 0660)
+		if err != nil {
+			return err
+		}
+		if _, err = f.WriteString("\nexport PATH=$PATH:/usr/local/go/bin\nexport GOROOT=/usr/local/go\n"); err != nil {
+			return err
+		}
+	}
+
+	if len(foundRCFiles) == 0 {
+		return fmt.Errorf("no supported system level shell rc files found. You may need to add \"export PATH=$PATH:/usr/local/go/bin\" and \"export GOROOT=/usr/local/go\" to your persistent envrionment variables")
+	}
+	return nil
 }
