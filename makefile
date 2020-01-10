@@ -11,6 +11,8 @@ test:
 build:
 	@if [ $(UNAMEM) == "x86_64" ]; then\
 		GOOS=$(UNAMES) GOARCH=amd64 $(GOBUILD);\
+	elif [ $(UNAMEM) == "i386" ]; then\
+		GOOS=$(UNAMES) GOARCH=386 $(GOBUILD);\
 	else\
 		GOOS=$(UNAMES) GOARCH=$(UNAMEM) $(GOBUILD);\
 	fi
